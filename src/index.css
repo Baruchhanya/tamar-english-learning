@@ -1,0 +1,116 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg: #fef9f0;
+  --color-primary: #ff6b6b;
+  --color-secondary: #4ecdc4;
+  --color-accent: #ffd93d;
+  --color-purple: #a855f7;
+  --color-green: #22c55e;
+  --color-blue: #3b82f6;
+  --color-orange: #f97316;
+  --color-text: #1e293b;
+  --color-text-light: #64748b;
+  --color-card: #ffffff;
+  --color-border: #e2e8f0;
+  --radius: 20px;
+  --radius-sm: 12px;
+  --shadow: 0 4px 20px rgba(0,0,0,0.08);
+  --shadow-hover: 0 8px 30px rgba(0,0,0,0.14);
+}
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  direction: rtl;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+input, textarea {
+  font-family: 'Nunito', sans-serif;
+}
+
+.card {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border-radius: 50px;
+  padding: 14px 32px;
+  font-size: 18px;
+  font-weight: 800;
+}
+.btn-primary:hover {
+  background: #e85d5d;
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: var(--color-secondary);
+  color: white;
+  border-radius: 50px;
+  padding: 14px 32px;
+  font-size: 18px;
+  font-weight: 800;
+}
+.btn-secondary:hover {
+  background: #3ab5ad;
+  transform: translateY(-2px);
+}
+
+@keyframes bounce-in {
+  0% { transform: scale(0.5); opacity: 0; }
+  70% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes star-burst {
+  0% { transform: scale(0) rotate(0deg); opacity: 1; }
+  100% { transform: scale(2) rotate(180deg); opacity: 0; }
+}
+
+.animate-bounce-in { animation: bounce-in 0.4s ease; }
+.animate-shake { animation: shake 0.5s ease; }
+.animate-pop { animation: pop 0.3s ease; }
+.animate-float { animation: float 3s ease-in-out infinite; }

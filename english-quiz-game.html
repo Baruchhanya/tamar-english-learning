@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>תרגול הכתבה באנגלית 🌟</title>
+  <meta name="description" content="משחק אינטראקטיבי לתרגול הכתבה באנגלית - 10 מילים עם הקראה וחידון מהנה." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Heebo:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Heebo', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #fef3c7 0%, #fce7f3 50%, #ddd6fe 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .font-en { font-family: 'Fredoka', 'Heebo', sans-serif; letter-spacing: 0.5px; }
+
+    .speakable { cursor: pointer; transition: transform 0.15s, color 0.15s; user-select: none; }
+    .speakable:hover { color: #6366f1; transform: scale(1.06); }
+    .speakable:active { transform: scale(0.96); }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-12px); }
+      40% { transform: translateX(12px); }
+      60% { transform: translateX(-8px); }
+      80% { transform: translateX(8px); }
+    }
+    .shake { animation: shake 0.5s; }
+
+    @keyframes happyBounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      30% { transform: translateY(-18px) scale(1.12); }
+      60% { transform: translateY(0) scale(1.05); }
+    }
+    .happy-bounce { animation: happyBounce 0.7s ease-out; }
+
+    .confetti {
+      position: fixed;
+      top: -50px;
+      pointer-events: none;
+      user-select: none;
+      z-index: 100;
+      animation: confettiFall linear forwards;
+    }
+    @keyframes confettiFall {
+      0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0.85; }
+    }
+
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.55); }
+      50%      { box-shadow: 0 0 45px rgba(34, 197, 94, 0.95); }
+    }
+    .glow-correct { animation: glow 1s ease-in-out 2; }
+
+    @keyframes pulseMini {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.18); }
+    }
+    .speaking { animation: pulseMini 0.6s ease-in-out infinite; }
+
+    .option-btn:disabled { cursor: default; }
+
+    /* Smooth fade-in for new content */
+    .fade-in { animation: fadeIn 0.35s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="text-gray-800">
+  <div class="max-w-4xl mx-auto p-4 md:p-6">
+    <!-- Header -->
+    <header class="text-center mb-6">
+      <h1 class="text-3xl md:text-5xl font-black text-purple-700 drop-shadow-sm">
+        🌟 תרגול הכתבה באנגלית 🌟
+      </h1>
+      <p class="text-gray-600 mt-2 text-sm md:text-base">
+        לחצי על כל מילה באנגלית כדי לשמוע אותה 🔊
+      </p>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="flex justify-center gap-2 mb-6">
+      <button id="tab-study" class="tab-btn px-6 py-3 rounded-full font-bold text-base md:text-lg shadow-lg transition">
+        📖 לימוד
+      </button>
+      <button id="tab-quiz" class="tab-btn px-6 py-3 rounded-full font-bold text-base md:text-lg shadow-lg transition">
+        🎮 משחק
+      </button>
+    </nav>
+
+    <!-- Study Section -->
+    <section id="study" class="hidden">
+      <div id="study-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+      <p class="text-center text-gray-500 text-sm mt-6">
+        לחצי על המילה באנגלית או על כפתור הרמקול כדי לשמוע אותה.
+      </p>
+    </section>
+
+    <!-- Quiz Section -->
+    <section id="quiz" class="hidden">
+      <div id="quiz-content" class="bg-white/95 backdrop-blur rounded-3xl shadow-xl p-5 md:p-8"></div>
+    </section>
+  </div>
+
+  <script>
+    /* ============================================================
+     *  DATA
+     * ============================================================ */
+
+    // 10 מילי המבחן
+    const WORDS = [
+      { en: 'wet',    he: 'רטוב',         translit: 'וֶט' },
+      { en: 'woman',  he: 'אישה',         translit: 'ווּמֶן' },
+      { en: 'wheat',  he: 'חיטה',         translit: 'וִויט' },
+      { en: 'water',  he: 'מים',          translit: 'ווֹטֶר' },
+      { en: 'wind',   he: 'רוח',          translit: 'וִוינְד' },
+      { en: 'doctor', he: 'רופא',         translit: 'דוֹקְטוֹר' },
+      { en: 'desk',   he: 'שולחן כתיבה',  translit: 'דֶסְק' },
+      { en: 'duck',   he: 'ברווז',        translit: 'דָאק' },
+      { en: 'window', he: 'חלון',         translit: 'וִוינְדוֹו' },
+      { en: 'walk',   he: 'לצעוד',        translit: 'ווֹק' },
+    ];
+
+    // מסיחים - מילים שגרתיות נוספות (לא חלק מהמבחן)
+    const DISTRACTORS = [
+      { en: 'cat',    he: 'חתול',     translit: 'קֶט' },
+      { en: 'dog',    he: 'כלב',      translit: 'דוֹג' },
+      { en: 'apple',  he: 'תפוח',     translit: 'אֶפֶּל' },
+      { en: 'book',   he: 'ספר',      translit: 'בּוּק' },
+      { en: 'sun',    he: 'שמש',      translit: 'סָאן' },
+      { en: 'moon',   he: 'ירח',      translit: 'מוּן' },
+      { en: 'house',  he: 'בית',      translit: 'הָאוּס' },
+      { en: 'car',    he: 'מכונית',   translit: 'קָאר' },
+      { en: 'tree',   he: 'עץ',       translit: 'טְרִי' },
+      { en: 'fish',   he: 'דג',       translit: 'פִישׁ' },
+      { en: 'milk',   he: 'חלב',      translit: 'מִילְק' },
+      { en: 'bread',  he: 'לחם',      translit: 'בְּרֶד' },
+      { en: 'chair',  he: 'כיסא',     translit: 'צֶ׳ר' },
+      { en: 'door',   he: 'דלת',      translit: 'דוֹר' },
+      { en: 'table',  he: 'שולחן',    translit: 'טֵייבְּל' },
+      { en: 'flower', he: 'פרח',      translit: 'פְלָאוּאֶר' },
+      { en: 'bird',   he: 'ציפור',    translit: 'בֶּרְד' },
+      { en: 'school', he: 'בית ספר',  translit: 'סְקוּל' },
+      { en: 'red',    he: 'אדום',     translit: 'רֶד' },
+      { en: 'blue',   he: 'כחול',     translit: 'בְּלוּ' },
+      { en: 'green',  he: 'ירוק',     translit: 'גְרִין' },
+      { en: 'happy',  he: 'שמח',      translit: 'הֶפִּי' },
+    ];
+
+    /* ============================================================
+     *  SPEECH (Web Speech API)
+     * ============================================================ */
+
+    let voices = [];
+    function loadVoices() { voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; }
+    if ('speechSynthesis' in window) {
+      speechSynthesis.addEventListener('voiceschanged', loadVoices);
+      loadVoices();
+    }
+
+    function speak(word, sourceEl) {
+      if (!('speechSynthesis' in window)) return;
+      try {
+        speechSynthesis.cancel();
+        const utt = new SpeechSynthesisUtterance(word);
+        utt.lang = 'en-US';
+        utt.rate = 0.85;
+        utt.pitch = 1.1;
+        const v = voices.find(v => /en-US/.test(v.lang) && /samantha|aria|jenny|female/i.test(v.name))
+              || voices.find(v => /en-US/.test(v.lang))
+              || voices.find(v => /^en/.test(v.lang));
+        if (v) utt.voice = v;
+        if (sourceEl) {
+          sourceEl.classList.add('speaking');
+          const stop = () => sourceEl.classList.remove('speaking');
+          utt.onend = stop;
+          utt.onerror = stop;
+        }
+        speechSynthesis.speak(utt);
+      } catch (e) { /* ignore */ }
+    }
+
+    /* ============================================================
+     *  HELPERS
+     * ============================================================ */
+
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function confetti() {
+      const emojis = ['🎉','⭐','🌟','✨','💖','🎊','🌈','🦄','🎈'];
+      for (let i = 0; i < 40; i++) {
+        const el = document.createElement('div');
+        el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+        el.className = 'confetti';
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.fontSize = (16 + Math.random() * 28) + 'px';
+        el.style.animationDuration = (1.6 + Math.random() * 2) + 's';
+        el.style.animationDelay = (Math.random() * 0.4) + 's';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 4500);
+      }
+    }
+
+    /* ============================================================
+     *  TABS
+     * ============================================================ */
+
+    const tabStudy = document.getElementById('tab-study');
+    const tabQuiz = document.getElementById('tab-quiz');
+    const sectionStudy = document.getElementById('study');
+    const sectionQuiz = document.getElementById('quiz');
+
+    function setTab(name) {
+      const isStudy = name === 'study';
+      sectionStudy.classList.toggle('hidden', !isStudy);
+      sectionQuiz.classList.toggle('hidden', isStudy);
+
+      const baseCls  = 'tab-btn px-6 py-3 rounded-full font-bold text-base md:text-lg shadow-lg transition ';
+      const onCls    = 'bg-purple-600 text-white scale-105';
+      const offCls   = 'bg-white text-purple-700 hover:bg-purple-100';
+      tabStudy.className = baseCls + (isStudy ? onCls : offCls);
+      tabQuiz.className  = baseCls + (!isStudy ? onCls : offCls);
+
+      if (!isStudy) startQuiz();
+    }
+    tabStudy.addEventListener('click', () => setTab('study'));
+    tabQuiz.addEventListener('click', () => setTab('quiz'));
+
+    /* ============================================================
+     *  STUDY MODE
+     * ============================================================ */
+
+    function renderStudy() {
+      const grid = document.getElementById('study-grid');
+      grid.innerHTML = '';
+      WORDS.forEach(w => {
+        const card = document.createElement('div');
+        card.className = 'fade-in bg-white/95 rounded-2xl shadow-md p-4 flex items-center gap-3 hover:shadow-xl transition';
+        card.innerHTML = `
+          <button class="speak-btn shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 text-white text-xl shadow-md hover:shadow-lg active:scale-95 transition flex items-center justify-center" aria-label="השמע מילה">🔊</button>
+          <div class="flex-1 text-center">
+            <div class="word-en speakable font-en text-3xl md:text-4xl font-bold text-indigo-700">${w.en}</div>
+            <div class="text-base md:text-lg text-purple-600 font-semibold mt-1" dir="rtl">${w.translit}</div>
+          </div>
+          <div class="shrink-0 text-base md:text-xl text-gray-700 font-bold border-r-2 border-pink-300 pr-3" dir="rtl">${w.he}</div>
+        `;
+        const speakBtn = card.querySelector('.speak-btn');
+        const enWord = card.querySelector('.word-en');
+        speakBtn.addEventListener('click', () => speak(w.en, speakBtn));
+        enWord.addEventListener('click', () => speak(w.en, speakBtn));
+        grid.appendChild(card);
+      });
+    }
+
+    /* ============================================================
+     *  QUIZ MODE
+     * ============================================================ */
+
+    let quizState = null;
+
+    function startQuiz() {
+      quizState = {
+        questions: shuffle(WORDS).map(w => ({
+          ...w,
+          direction: Math.random() < 0.5 ? 'enToHe' : 'heToEn',
+        })),
+        index: 0,
+        score: 0,
+        results: [],
+      };
+      renderQuestion();
+    }
+
+    function getTransliteration(en) {
+      const w = WORDS.find(x => x.en === en) || DISTRACTORS.find(x => x.en === en);
+      return w ? w.translit : '';
+    }
+
+    function renderQuestion() {
+      const s = quizState;
+      const container = document.getElementById('quiz-content');
+      if (s.index >= s.questions.length) { renderEndScreen(); return; }
+
+      const q = s.questions[s.index];
+      const correct = (q.direction === 'enToHe') ? q.he : q.en;
+
+      // Build distractor pool from other test words + general distractors
+      const pool = [
+        ...WORDS.filter(w => w.en !== q.en),
+        ...DISTRACTORS,
+      ];
+      // Pick 5 distractor values (no duplicates)
+      const distractorValues = [];
+      const seen = new Set([correct]);
+      for (const w of shuffle(pool)) {
+        const val = (q.direction === 'enToHe') ? w.he : w.en;
+        if (seen.has(val)) continue;
+        seen.add(val);
+        distractorValues.push(val);
+        if (distractorValues.length === 5) break;
+      }
+      const options = shuffle([correct, ...distractorValues]);
+
+      // Reset per-question state
+      s.currentCorrect = correct;
+      s.attemptsLeft = 2;
+      s.locked = false;
+
+      const promptText = q.direction === 'enToHe' ? '✏️ איך אומרים בעברית?' : '✏️ איך אומרים באנגלית?';
+      const wordHTML = q.direction === 'enToHe'
+        ? `
+          <div class="word-en font-en text-5xl md:text-7xl font-bold text-indigo-700 mb-2 speakable" id="speak-target">${q.en}</div>
+          <div class="text-xl md:text-2xl text-purple-600 font-semibold" dir="rtl">${q.translit}</div>
+          <div class="text-sm text-gray-500 mt-1" dir="rtl">פירוש בעברית: <span class="opacity-50">מוסתר 🤫</span></div>`
+        : `<div class="text-5xl md:text-7xl font-black text-pink-600" dir="rtl">${q.he}</div>`;
+
+      container.innerHTML = `
+        <div class="flex justify-between items-center mb-3 text-sm md:text-base flex-wrap gap-2">
+          <div class="font-bold text-purple-700">שאלה ${s.index + 1} / ${s.questions.length}</div>
+          <div id="lives" class="text-2xl" title="ניסיונות שנותרו">❤️❤️</div>
+          <div class="font-bold text-green-600">ניקוד: <span id="score-num">${s.score}</span></div>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-2 mb-6 overflow-hidden">
+          <div class="bg-gradient-to-r from-pink-500 to-purple-500 h-2 rounded-full transition-all" style="width: ${(s.index/s.questions.length)*100}%"></div>
+        </div>
+
+        <div class="text-center mb-6 fade-in">
+          <div class="text-lg md:text-xl text-gray-700 mb-3 font-bold">${promptText}</div>
+          ${wordHTML}
+          ${q.direction === 'enToHe'
+            ? `<button id="quiz-speak" class="mt-3 px-4 py-2 bg-gradient-to-br from-pink-400 to-purple-500 text-white rounded-full text-base font-bold shadow hover:shadow-md active:scale-95 transition">🔊 שמע שוב</button>`
+            : ''}
+        </div>
+
+        <div id="options" class="grid grid-cols-2 md:grid-cols-3 gap-3 fade-in"></div>
+
+        <div id="feedback" class="mt-6 text-center min-h-[4rem]"></div>
+      `;
+
+      // Render options
+      const optsEl = document.getElementById('options');
+      options.forEach(opt => {
+        const isEnglish = q.direction === 'heToEn';
+        const translit = isEnglish ? getTransliteration(opt) : '';
+        const btn = document.createElement('button');
+        btn.className = 'option-btn bg-white hover:bg-purple-50 active:scale-95 border-2 border-purple-200 rounded-2xl p-3 md:p-4 shadow transition flex flex-col items-center justify-center gap-1 min-h-[5rem]';
+        btn.dataset.value = opt;
+        btn.innerHTML = isEnglish
+          ? `<span class="font-en text-2xl md:text-3xl font-bold text-indigo-700">${opt}</span>${translit ? `<span class="text-sm text-purple-500" dir="rtl">${translit}</span>` : ''}`
+          : `<span class="text-xl md:text-2xl font-bold text-gray-800" dir="rtl">${opt}</span>`;
+        btn.addEventListener('click', () => handleAnswer(opt, btn));
+        optsEl.appendChild(btn);
+      });
+
+      // Bind speak handlers for English question word
+      if (q.direction === 'enToHe') {
+        const target = document.getElementById('speak-target');
+        target.addEventListener('click', () => speak(q.en, target));
+        const speakBtn = document.getElementById('quiz-speak');
+        speakBtn.addEventListener('click', () => speak(q.en, speakBtn));
+        // Auto-pronounce so she hears the word right away
+        setTimeout(() => speak(q.en, target), 350);
+      }
+    }
+
+    function disableAllOptions() {
+      document.querySelectorAll('.option-btn').forEach(b => {
+        b.disabled = true;
+        b.classList.remove('hover:bg-purple-50');
+      });
+    }
+
+    function handleAnswer(option, btn) {
+      const s = quizState;
+      if (s.locked) return;
+      if (btn.disabled) return;
+
+      const feedback = document.getElementById('feedback');
+      const livesEl = document.getElementById('lives');
+
+      if (option === s.currentCorrect) {
+        // ===== CORRECT =====
+        s.locked = true;
+        btn.classList.remove('bg-white', 'border-purple-200', 'hover:bg-purple-50');
+        btn.classList.add(
+          'bg-gradient-to-br', 'from-green-300', 'to-green-500',
+          'text-white', 'border-green-600', 'glow-correct', 'happy-bounce'
+        );
+        confetti();
+
+        // Repeat the English word out loud (so she remembers it)
+        const correctEn = s.questions[s.index].en;
+        setTimeout(() => speak(correctEn), 250);
+
+        const wasFirstTry = s.attemptsLeft === 2;
+        if (wasFirstTry) s.score += 1;
+        s.results.push({ word: s.questions[s.index], status: wasFirstTry ? 'perfect' : 'good' });
+
+        document.getElementById('score-num').textContent = s.score;
+        disableAllOptions();
+
+        feedback.innerHTML = `
+          <div class="text-3xl md:text-4xl font-black ${wasFirstTry ? 'text-green-600' : 'text-emerald-500'} happy-bounce">
+            ${wasFirstTry ? '🎉 כל הכבוד!' : '👍 יפה מאוד!'}
+          </div>
+          <button id="next-btn" class="mt-4 px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full font-bold text-lg shadow-lg hover:shadow-xl active:scale-95 transition">
+            המשך ←
+          </button>
+        `;
+        document.getElementById('next-btn').addEventListener('click', nextQuestion);
+        return;
+      }
+
+      // ===== WRONG =====
+      s.attemptsLeft -= 1;
+      btn.classList.remove('bg-white', 'border-purple-200', 'hover:bg-purple-50');
+      btn.classList.add('bg-red-100', 'border-red-400', 'text-red-700', 'shake', 'opacity-60');
+      btn.disabled = true;
+      setTimeout(() => btn.classList.remove('shake'), 600);
+
+      livesEl.textContent = '❤️'.repeat(s.attemptsLeft) + '💔'.repeat(2 - s.attemptsLeft);
+
+      if (s.attemptsLeft <= 0) {
+        // Reveal correct answer
+        s.locked = true;
+        const correctBtn = [...document.querySelectorAll('.option-btn')]
+          .find(b => b.dataset.value === s.currentCorrect);
+        if (correctBtn) {
+          correctBtn.classList.remove('bg-white', 'border-purple-200', 'hover:bg-purple-50', 'opacity-60');
+          correctBtn.classList.add(
+            'bg-gradient-to-br', 'from-green-300', 'to-green-500',
+            'text-white', 'border-green-600', 'glow-correct'
+          );
+        }
+        s.results.push({ word: s.questions[s.index], status: 'missed' });
+        disableAllOptions();
+
+        // Speak correct word so she hears it correctly
+        setTimeout(() => speak(s.questions[s.index].en), 250);
+
+        feedback.innerHTML = `
+          <div class="text-2xl md:text-3xl font-bold text-orange-500">😅 לא נורא!</div>
+          <div class="text-base md:text-lg text-gray-700 mt-1">התשובה הנכונה מסומנת בירוק 💚</div>
+          <button id="next-btn" class="mt-4 px-8 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full font-bold text-lg shadow-lg hover:shadow-xl active:scale-95 transition">
+            המשך ←
+          </button>
+        `;
+        document.getElementById('next-btn').addEventListener('click', nextQuestion);
+      } else {
+        feedback.innerHTML = `
+          <div class="text-xl md:text-2xl font-bold text-orange-500">🤔 אופס... נסי שוב!</div>
+          <div class="text-sm text-gray-500 mt-1">נשאר עוד ניסיון אחד 💪</div>
+        `;
+      }
+    }
+
+    function nextQuestion() {
+      quizState.index += 1;
+      renderQuestion();
+    }
+
+    function renderEndScreen() {
+      const s = quizState;
+      const container = document.getElementById('quiz-content');
+      const total = s.questions.length;
+      const perfect = s.results.filter(r => r.status === 'perfect').length;
+      const good    = s.results.filter(r => r.status === 'good').length;
+      const missed  = s.results.filter(r => r.status === 'missed').length;
+
+      const stars   = perfect >= 9 ? '🏆🌟🌟🌟' : perfect >= 7 ? '🌟🌟' : perfect >= 5 ? '🌟' : '💪';
+      const message = perfect === total ? 'מושלם! את אלופה!'
+                    : perfect >= 7      ? 'מצוין! ממש כל הכבוד!'
+                    : perfect >= 5      ? 'יפה מאוד! בואי לסיבוב נוסף!'
+                    : 'תרגול נוסף ואת תהיי אלופה!';
+
+      const reviewWords = s.results
+        .filter(r => r.status !== 'perfect')
+        .map(r => r.word)
+        .filter((v, i, arr) => arr.findIndex(x => x.en === v.en) === i);
+
+      container.innerHTML = `
+        <div class="text-center fade-in">
+          <div class="text-6xl mb-3">${stars}</div>
+          <div class="text-2xl md:text-3xl font-black text-purple-700 mb-5">${message}</div>
+
+          <div class="grid grid-cols-3 gap-3 mb-6 max-w-md mx-auto">
+            <div class="bg-green-100 rounded-2xl p-3">
+              <div class="text-3xl font-black text-green-600">${perfect}</div>
+              <div class="text-xs md:text-sm text-green-700 font-bold">מושלם 🎯</div>
+            </div>
+            <div class="bg-yellow-100 rounded-2xl p-3">
+              <div class="text-3xl font-black text-yellow-600">${good}</div>
+              <div class="text-xs md:text-sm text-yellow-700 font-bold">בניסיון 2 👍</div>
+            </div>
+            <div class="bg-red-100 rounded-2xl p-3">
+              <div class="text-3xl font-black text-red-500">${missed}</div>
+              <div class="text-xs md:text-sm text-red-600 font-bold">לתרגל 💪</div>
+            </div>
+          </div>
+
+          ${reviewWords.length > 0 ? `
+            <div class="text-right bg-purple-50 rounded-2xl p-4 mb-6">
+              <div class="font-bold text-purple-700 mb-3">📝 מילים לחזרה:</div>
+              <div class="space-y-2">
+                ${reviewWords.map(w => `
+                  <div class="flex items-center gap-3 bg-white rounded-xl p-2 shadow-sm">
+                    <button class="review-speak shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 text-white shadow flex items-center justify-center" data-word="${w.en}" aria-label="השמע ${w.en}">🔊</button>
+                    <div class="font-en text-2xl font-bold text-indigo-700">${w.en}</div>
+                    <div class="text-purple-600 font-semibold" dir="rtl">${w.translit}</div>
+                    <div class="text-gray-700" dir="rtl">— ${w.he}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <button id="restart" class="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full font-black text-xl shadow-lg hover:shadow-xl active:scale-95 transition">
+            🔄 משחק חדש
+          </button>
+          <button id="back-to-study" class="block mx-auto mt-3 text-purple-600 underline text-sm">
+            חזרה ללימוד 📖
+          </button>
+        </div>
+      `;
+
+      document.getElementById('restart').addEventListener('click', startQuiz);
+      document.getElementById('back-to-study').addEventListener('click', () => setTab('study'));
+      container.querySelectorAll('.review-speak').forEach(btn => {
+        btn.addEventListener('click', () => speak(btn.dataset.word, btn));
+      });
+
+      if (perfect === total) confetti();
+    }
+
+    /* ============================================================
+     *  INIT
+     * ============================================================ */
+
+    renderStudy();
+    setTab('study');
+
+    // Some browsers (iOS Safari) require user interaction before speech works.
+    // Cancel any pending utterance on first tap to "warm up" the engine.
+    document.addEventListener('click', function warmup() {
+      try { speechSynthesis.cancel(); } catch (e) {}
+      document.removeEventListener('click', warmup);
+    }, { once: true });
+  </script>
+</body>
+</html>
