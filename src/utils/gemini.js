@@ -1,11 +1,67 @@
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
+const API_KEY = import.meta.env.VITE_GEMINI_KEY;
+
+async function callGemini(body) {
+  const res = await fetch(`${GEMINI_URL}?key=${API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!text) throw new Error('תגובה ריקה מ-Gemini');
+  return text;
+}
+
 /**
- * Given a base64-encoded image, extracts English words and returns their
- * Hebrew translation + nikud phonetics in one Gemini Vision call.
+ * Given an English word, returns { hebrew, phonetic }.
  */
-export async function extractWordsFromImage(imageBase64, mimeType, apiKey) {
+export async function translateWord(english) {
+  const prompt = `You are a Hebrew-English dictionary for children.
+Given the English word "${english}", return ONLY valid JSON (no markdown, no code blocks):
+{
+  "hebrew": "<Hebrew translation>",
+  "phonetic": "<pronunciation in Hebrew letters WITH nikud, hyphens between syllables>"
+}
+Rules: phonetic must use Hebrew letters+nikud. Return ONLY the JSON object.`;
+
+  const text = await callGemini({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 200 },
+  });
+  const cleaned = text.replace(/```json|```/g, '').trim();
+  const parsed = JSON.parse(cleaned);
+  if (!parsed.hebrew || !parsed.phonetic) throw new Error('פורמט שגוי');
+  return parsed;
+}
+
+/**
+ * Translate a batch of English words at once.
+ */
+export async function translateBatch(englishWords) {
+  const prompt = `You are a Hebrew-English dictionary for children.
+Given: ${JSON.stringify(englishWords)}
+Return ONLY a valid JSON array (no markdown):
+[{ "english": "<word>", "hebrew": "<translation>", "phonetic": "<Hebrew nikud pronunciation>" }]`;
+
+  const text = await callGemini({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 1000 },
+  });
+  const cleaned = text.replace(/```json|```/g, '').trim();
+  return JSON.parse(cleaned);
+}
+
+/**
+ * Extract English words from an image and return translations + phonetics.
+ */
+export async function extractWordsFromImage(imageBase64, mimeType) {
   const prompt = `This is a photo of an English vocabulary list from an Israeli elementary school.
 Extract ALL English words visible in this image. For each word provide:
 1. The English word (exactly as written)
@@ -21,120 +77,22 @@ Return ONLY a valid JSON array — no markdown, no code blocks, nothing else:
   }
 ]
 Rules:
-- Extract ONLY English words; ignore any Hebrew text in the image
-- Keep the English word exactly as written (original capitalisation)
+- Extract ONLY English words; ignore Hebrew text in the image
+- Keep the English word exactly as written
 - Phonetic MUST use Hebrew letters with nikud marks
 - Return ONLY the JSON array`;
 
-  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { inline_data: { mime_type: mimeType, data: imageBase64 } },
-          { text: prompt },
-        ],
-      }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
-    }),
+  const text = await callGemini({
+    contents: [{
+      parts: [
+        { inline_data: { mime_type: mimeType, data: imageBase64 } },
+        { text: prompt },
+      ],
+    }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${res.status}`);
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if (!text) throw new Error('תגובה ריקה מ-Gemini');
-
   const cleaned = text.replace(/```json|```/g, '').trim();
   const parsed = JSON.parse(cleaned);
   if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('לא נמצאו מילים בתמונה');
   return parsed;
-}
-
-/**
- * Given an English word, returns { hebrew, phonetic } where:
- *   hebrew  – Hebrew translation
- *   phonetic – how the word sounds spelled in Hebrew letters with nikud
- */
-export async function translateWord(english, apiKey) {
-  const prompt = `You are a Hebrew-English dictionary for children.
-Given the English word "${english}", return ONLY valid JSON (no markdown, no code blocks) with exactly these fields:
-{
-  "hebrew": "<Hebrew translation of the word>",
-  "phonetic": "<how to pronounce the English word using Hebrew letters WITH nikud, e.g. for 'apple' → 'אֶ-פֶּל', for 'dog' → 'דּוֹג', for 'beautiful' → 'בְּיוּ-טִי-פוּל'>"
-}
-Rules:
-- phonetic must use Hebrew letters and nikud (vowel marks) to show how the English word sounds
-- Use hyphens to separate syllables in phonetic
-- Keep it simple and accurate for a child
-- Return ONLY the JSON object, nothing else`;
-
-  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 200 },
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${res.status}`);
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if (!text) throw new Error('תגובה ריקה מ-Gemini');
-
-  const cleaned = text.replace(/```json|```/g, '').trim();
-  const parsed = JSON.parse(cleaned);
-  if (!parsed.hebrew || !parsed.phonetic) throw new Error('פורמט שגוי');
-  return parsed;
-}
-
-/**
- * Translate a batch of words at once (more efficient)
- */
-export async function translateBatch(englishWords, apiKey) {
-  const prompt = `You are a Hebrew-English dictionary for children.
-Given this list of English words: ${JSON.stringify(englishWords)}
-
-Return ONLY valid JSON array (no markdown) with one object per word:
-[
-  {
-    "english": "<the word>",
-    "hebrew": "<Hebrew translation>",
-    "phonetic": "<pronunciation in Hebrew letters WITH nikud, hyphens between syllables>"
-  }
-]
-Rules:
-- phonetic must use Hebrew letters and nikud to show how the English word sounds
-- Example: "apple" → phonetic "אֶ-פֶּל", "dog" → "דּוֹג", "school" → "סְקוּל"
-- Return ONLY the JSON array, nothing else`;
-
-  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 1000 },
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${res.status}`);
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if (!text) throw new Error('תגובה ריקה מ-Gemini');
-
-  const cleaned = text.replace(/```json|```/g, '').trim();
-  return JSON.parse(cleaned);
 }

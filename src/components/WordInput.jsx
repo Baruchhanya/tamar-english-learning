@@ -2,16 +2,16 @@ import { useState, useRef } from 'react';
 import { translateWord, translateBatch, extractWordsFromImage } from '../utils/gemini';
 import { BUILTIN_SETS } from '../data/builtinWords';
 
-export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
+export default function WordInput({ onWordsReady }) {
   const [words, setWords] = useState([{ english: '', hebrew: '', phonetic: '' }]);
-  const [translating, setTranslating] = useState({}); // idx → true/false
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [tab, setTab] = useState('builtin');
+  const [translating, setTranslating] = useState({});
+  const [tab, setTab] = useState('image');
   const [error, setError] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [selectedSet, setSelectedSet] = useState(null);
-  const [imageWords, setImageWords] = useState([]); // words extracted from image
+  const [imageWords, setImageWords] = useState([]);
   const [imagePreview, setImagePreview] = useState(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
   const fileRef = useRef();
 
   const updateWord = (idx, field, value) => {
@@ -27,23 +27,15 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
     setWords(words.filter((_, i) => i !== idx));
   };
 
-  // Auto-translate when English field loses focus and Hebrew is empty
   const handleEnglishBlur = async (idx) => {
     const word = words[idx];
-    if (!word.english.trim()) return;
-    if (word.hebrew.trim()) return; // already has translation
-    if (!apiKey) return; // no key yet
-
+    if (!word.english.trim() || word.hebrew.trim()) return;
     setTranslating(t => ({ ...t, [idx]: true }));
     try {
-      const result = await translateWord(word.english.trim(), apiKey);
+      const result = await translateWord(word.english.trim());
       setWords(prev => {
         const updated = [...prev];
-        updated[idx] = {
-          ...updated[idx],
-          hebrew: result.hebrew,
-          phonetic: result.phonetic,
-        };
+        updated[idx] = { ...updated[idx], hebrew: result.hebrew, phonetic: result.phonetic };
         return updated;
       });
     } catch (e) {
@@ -52,28 +44,21 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
     setTranslating(t => ({ ...t, [idx]: false }));
   };
 
-  // Translate ALL words that are missing Hebrew at once
   const handleTranslateAll = async () => {
     const needsTranslation = words
       .map((w, i) => ({ ...w, idx: i }))
       .filter(w => w.english.trim() && !w.hebrew.trim());
-
     if (!needsTranslation.length) return;
-    if (!apiKey) { onOpenApiModal(); return; }
 
     setBulkLoading(true);
     try {
-      const results = await translateBatch(needsTranslation.map(w => w.english.trim()), apiKey);
+      const results = await translateBatch(needsTranslation.map(w => w.english.trim()));
       setWords(prev => {
         const updated = [...prev];
         results.forEach(r => {
           const match = needsTranslation.find(w => w.english.trim().toLowerCase() === r.english.toLowerCase());
           if (match !== undefined) {
-            updated[match.idx] = {
-              ...updated[match.idx],
-              hebrew: r.hebrew,
-              phonetic: r.phonetic,
-            };
+            updated[match.idx] = { ...updated[match.idx], hebrew: r.hebrew, phonetic: r.phonetic };
           }
         });
         return updated;
@@ -98,38 +83,21 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
     })));
   };
 
-  const handleLoadSample = () => {
-    const set = BUILTIN_SETS[0];
-    setWords(set.words.map(w => ({ ...w })));
-  };
-
-  const handleSelectBuiltinSet = (set) => {
-    setSelectedSet(set);
-  };
-
-  const handlePlayBuiltinSet = (set) => {
-    onWordsReady(set.words.map(w => ({ ...w })));
-  };
-
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    // Reset state
     setImageWords([]);
     setError('');
-    // Show image preview
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreview(previewUrl);
+    setImagePreview(URL.createObjectURL(file));
     setOcrLoading(true);
     try {
-      // Convert image to base64
       const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result.split(',')[1]);
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-      const extracted = await extractWordsFromImage(base64, file.type, apiKey);
+      const extracted = await extractWordsFromImage(base64, file.type);
       setImageWords(extracted.map(w => ({
         english: w.english?.trim().toLowerCase() || '',
         hebrew: w.hebrew?.trim() || '',
@@ -139,15 +107,11 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
       setError(`שגיאה בקריאת התמונה: ${err.message}`);
     }
     setOcrLoading(false);
-    // Reset file input so the same file can be re-selected
     e.target.value = '';
   };
 
   const handlePlayImageWords = () => {
-    if (imageWords.length < 2) {
-      setError('לא נמצאו מספיק מילים בתמונה');
-      return;
-    }
+    if (imageWords.length < 2) { setError('לא נמצאו מספיק מילים בתמונה'); return; }
     onWordsReady(imageWords);
   };
 
@@ -157,41 +121,20 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 16px' }}>
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 64, marginBottom: 8 }}>📚</div>
-        <h1 style={{
-          fontFamily: 'Fredoka One, cursive',
-          fontSize: 36, color: '#ff6b6b', marginBottom: 8
-        }}>
+        <h1 style={{ fontFamily: 'Fredoka One, cursive', fontSize: 36, color: '#ff6b6b', marginBottom: 8 }}>
           בואי נלמד מילים!
         </h1>
         <p style={{ color: '#64748b', fontSize: 17 }}>
-          הכניסי את המילים שלך ונתחיל לשחק
+          צלמי את המילים מבית הספר ונתחיל לשחק
         </p>
       </div>
-
-      {/* Gemini banner if no key */}
-      {!apiKey && (
-        <button
-          onClick={onOpenApiModal}
-          style={{
-            width: '100%', marginBottom: 16, padding: '14px 20px',
-            background: '#faf5ff', border: '2px dashed #c084fc',
-            borderRadius: 16, color: '#7c3aed', fontSize: 15, fontWeight: 700,
-            textAlign: 'center', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', gap: 8
-          }}
-        >
-          <span style={{ fontSize: 20 }}>✨</span>
-          חברי Gemini AI לתרגום אוטומטי + הגייה בניקוד
-          <span style={{ fontSize: 20 }}>←</span>
-        </button>
-      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {[
-          { id: 'builtin', label: '🎮 משחק מוכן' },
-          { id: 'manual', label: '✏️ המילים שלי' },
-          { id: 'image', label: '📷 תמונה' },
+          { id: 'image',   label: '📷 תמונה' },
+          { id: 'manual',  label: '✏️ הקלדה' },
+          { id: 'builtin', label: '🎮 משחקים מובנים' },
         ].map(t => (
           <button
             key={t.id}
@@ -209,93 +152,7 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
         ))}
       </div>
 
-      {tab === 'builtin' && !selectedSet && (
-        <div>
-          <p style={{ color: '#64748b', fontSize: 15, marginBottom: 16, textAlign: 'center', fontWeight: 600 }}>
-            בחרי נושא ושחקי עם מילים לכיתה ג׳ — בלי להכניס כלום!
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {BUILTIN_SETS.map(set => (
-              <button
-                key={set.id}
-                onClick={() => handleSelectBuiltinSet(set)}
-                style={{
-                  background: set.bg,
-                  border: `3px solid ${set.color}`,
-                  borderRadius: 20, padding: '20px 16px',
-                  textAlign: 'right', cursor: 'pointer',
-                  transition: 'transform 0.15s ease',
-                }}
-                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
-                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-              >
-                <div style={{ fontSize: 36, marginBottom: 6 }}>{set.icon}</div>
-                <div style={{ fontFamily: 'Fredoka One, cursive', fontSize: 20, color: set.color, marginBottom: 4 }}>
-                  {set.name}
-                </div>
-                <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>
-                  {set.words.length} מילים
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {tab === 'builtin' && selectedSet && (
-        <div className="card" style={{ marginBottom: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-            <button
-              onClick={() => setSelectedSet(null)}
-              style={{
-                background: '#f1f5f9', borderRadius: 50, padding: '6px 14px',
-                color: '#475569', fontSize: 14, fontWeight: 700
-              }}
-            >
-              ← חזרה
-            </button>
-            <span style={{ fontSize: 28 }}>{selectedSet.icon}</span>
-            <span style={{
-              fontFamily: 'Fredoka One, cursive', fontSize: 22,
-              color: selectedSet.color
-            }}>
-              {selectedSet.name}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-            {selectedSet.words.map((w, i) => (
-              <div key={i} style={{
-                background: selectedSet.bg, border: `2px solid ${selectedSet.color}`,
-                borderRadius: 12, padding: '8px 14px', fontSize: 14
-              }}>
-                <span dir="ltr" style={{ fontWeight: 800, color: selectedSet.color }}>{w.english}</span>
-                <span style={{ margin: '0 6px', color: '#cbd5e1' }}>|</span>
-                <span style={{ fontWeight: 600 }}>{w.hebrew}</span>
-                {w.phonetic && (
-                  <>
-                    <span style={{ margin: '0 6px', color: '#cbd5e1' }}>|</span>
-                    <span style={{ color: '#a855f7', fontSize: 12 }}>{w.phonetic}</span>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={() => handlePlayBuiltinSet(selectedSet)}
-            style={{
-              width: '100%', padding: '18px',
-              background: selectedSet.color,
-              color: '#fff', borderRadius: 20, fontSize: 22,
-              fontWeight: 800, fontFamily: 'Fredoka One, cursive',
-            }}
-          >
-            🚀 בואי נשחק!
-          </button>
-        </div>
-      )}
-
+      {/* ── IMAGE TAB ── */}
       {tab === 'image' && (
         <div className="card" style={{ marginBottom: 16 }}>
           <input
@@ -307,44 +164,36 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
             onChange={handleImageUpload}
           />
 
-          {/* Step 1: No API key */}
-          {!apiKey && (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ fontSize: 56, marginBottom: 12 }}>✨</div>
-              <p style={{ fontSize: 16, fontWeight: 700, color: '#7c3aed', marginBottom: 6 }}>
-                כדי לקרוא תמונה צריך לחבר את Gemini AI
-              </p>
-              <p style={{ color: '#64748b', fontSize: 14, marginBottom: 20 }}>
-                Gemini מזהה את המילים בתמונה ומתרגם אוטומטית — בלי להקליד כלום!
-              </p>
-              <button
-                onClick={onOpenApiModal}
-                style={{
-                  background: '#a855f7', color: '#fff', borderRadius: 50,
-                  padding: '14px 36px', fontSize: 16, fontWeight: 800,
-                }}
-              >
-                חברי Gemini ←
-              </button>
+          {/* Loading */}
+          {ocrLoading && (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              {imagePreview && (
+                <img src={imagePreview} alt="תמונה"
+                  style={{ maxHeight: 180, maxWidth: '100%', borderRadius: 16, marginBottom: 20, objectFit: 'contain', boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}
+                />
+              )}
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+              <p style={{ fontSize: 18, fontWeight: 800, color: '#7c3aed', marginBottom: 6 }}>Gemini קורא את המילים...</p>
+              <p style={{ color: '#94a3b8', fontSize: 14 }}>רק כמה שניות</p>
             </div>
           )}
 
-          {/* Step 2: Initial upload state */}
-          {apiKey && !ocrLoading && imageWords.length === 0 && (
+          {/* Initial upload */}
+          {!ocrLoading && imageWords.length === 0 && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <div style={{ fontSize: 72, marginBottom: 8 }}>📷</div>
-              <p style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+              <div style={{ fontSize: 80, marginBottom: 8 }}>📷</div>
+              <p style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 6 }}>
                 צלמי את דף המילים מבית הספר!
               </p>
-              <p style={{ color: '#64748b', fontSize: 14, marginBottom: 24 }}>
-                Gemini יקרא את המילים, יתרגם לעברית ויפתח את המשחק — הכל אוטומטית 🪄
+              <p style={{ color: '#64748b', fontSize: 15, marginBottom: 28 }}>
+                Gemini יקרא את המילים, יתרגם ויפתח את המשחק 🪄
               </p>
               <button
                 onClick={() => fileRef.current.click()}
                 style={{
                   background: 'linear-gradient(135deg, #4ecdc4, #a855f7)',
                   color: '#fff', borderRadius: 50,
-                  padding: '16px 40px', fontSize: 18, fontWeight: 800,
+                  padding: '18px 48px', fontSize: 20, fontWeight: 800,
                   boxShadow: '0 4px 20px rgba(168,85,247,0.35)',
                 }}
               >
@@ -353,32 +202,8 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
             </div>
           )}
 
-          {/* Step 3: Loading */}
-          {apiKey && ocrLoading && (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              {imagePreview && (
-                <img
-                  src={imagePreview}
-                  alt="תמונה שהועלתה"
-                  style={{
-                    maxHeight: 180, maxWidth: '100%', borderRadius: 16,
-                    marginBottom: 20, objectFit: 'contain',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-                  }}
-                />
-              )}
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
-              <p style={{ fontSize: 18, fontWeight: 800, color: '#7c3aed', marginBottom: 6 }}>
-                Gemini קורא את המילים...
-              </p>
-              <p style={{ color: '#94a3b8', fontSize: 14 }}>
-                זה לוקח כמה שניות
-              </p>
-            </div>
-          )}
-
-          {/* Step 4: Words extracted — show & play */}
-          {apiKey && !ocrLoading && imageWords.length > 0 && (
+          {/* Words found */}
+          {!ocrLoading && imageWords.length > 0 && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                 <span style={{ fontSize: 24 }}>✅</span>
@@ -387,7 +212,7 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
                 </span>
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
                 {imageWords.map((w, i) => (
                   <div key={i} style={{
                     background: '#f0fdf4', border: '2px solid #86efac',
@@ -397,12 +222,10 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
                     <span dir="ltr" style={{ fontWeight: 800, color: '#15803d' }}>{w.english}</span>
                     <span style={{ color: '#cbd5e1' }}>|</span>
                     <span style={{ fontWeight: 600 }}>{w.hebrew}</span>
-                    {w.phonetic && (
-                      <>
-                        <span style={{ color: '#cbd5e1' }}>|</span>
-                        <span style={{ color: '#a855f7', fontSize: 12 }}>{w.phonetic}</span>
-                      </>
-                    )}
+                    {w.phonetic && <>
+                      <span style={{ color: '#cbd5e1' }}>|</span>
+                      <span style={{ color: '#a855f7', fontSize: 12 }}>{w.phonetic}</span>
+                    </>}
                   </div>
                 ))}
               </div>
@@ -435,12 +258,11 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
             </div>
           )}
 
-          {/* Error */}
-          {error && tab === 'image' && (
+          {error && (
             <div style={{
               marginTop: 16, background: '#fee2e2', color: '#dc2626',
-              borderRadius: 12, padding: '12px 16px', fontWeight: 700, textAlign: 'center',
-              fontSize: 14,
+              borderRadius: 12, padding: '12px 16px', fontWeight: 700,
+              textAlign: 'center', fontSize: 14,
             }}>
               {error}
               <button
@@ -454,20 +276,14 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
         </div>
       )}
 
+      {/* ── MANUAL TAB ── */}
       {tab === 'manual' && (
         <div className="card" style={{ marginBottom: 16 }}>
-          {/* Column headers */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <div style={{ width: 28 }} />
-            <div style={{ flex: 1.2, fontWeight: 800, color: '#64748b', fontSize: 13, textAlign: 'center' }}>
-              🇬🇧 מילה באנגלית
-            </div>
-            <div style={{ flex: 1, fontWeight: 800, color: '#64748b', fontSize: 13, textAlign: 'center' }}>
-              🇮🇱 תרגום
-            </div>
-            <div style={{ flex: 1, fontWeight: 800, color: '#a855f7', fontSize: 13, textAlign: 'center' }}>
-              🔤 הגייה בניקוד
-            </div>
+            <div style={{ flex: 1.2, fontWeight: 800, color: '#64748b', fontSize: 13, textAlign: 'center' }}>🇬🇧 מילה באנגלית</div>
+            <div style={{ flex: 1,   fontWeight: 800, color: '#64748b', fontSize: 13, textAlign: 'center' }}>🇮🇱 תרגום</div>
+            <div style={{ flex: 1,   fontWeight: 800, color: '#a855f7', fontSize: 13, textAlign: 'center' }}>🔤 הגייה</div>
             <div style={{ width: 32 }} />
           </div>
 
@@ -477,12 +293,11 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
                 width: 28, height: 28, borderRadius: '50%',
                 background: '#ff6b6b', color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 800, fontSize: 13, flexShrink: 0
+                fontWeight: 800, fontSize: 13, flexShrink: 0,
               }}>
                 {idx + 1}
               </div>
 
-              {/* English */}
               <input
                 value={word.english}
                 onChange={e => updateWord(idx, 'english', e.target.value)}
@@ -491,14 +306,13 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
                 dir="ltr"
                 style={{
                   flex: 1.2, padding: '10px 12px', borderRadius: 12,
-                  border: '2px solid #e2e8f0', fontSize: 15,
-                  outline: 'none', fontFamily: 'Nunito, sans-serif',
-                  textAlign: 'left'
+                  border: '2px solid #e2e8f0', fontSize: 15, outline: 'none',
+                  fontFamily: 'Nunito, sans-serif', textAlign: 'left',
                 }}
                 onFocus={e => e.target.style.borderColor = '#ff6b6b'}
+                onBlur={e => { e.target.style.borderColor = '#e2e8f0'; handleEnglishBlur(idx); }}
               />
 
-              {/* Hebrew translation */}
               <div style={{ flex: 1, position: 'relative' }}>
                 <input
                   value={word.hebrew}
@@ -510,56 +324,37 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
                     width: '100%', padding: '10px 12px', borderRadius: 12,
                     border: `2px solid ${translating[idx] ? '#a855f7' : '#e2e8f0'}`,
                     fontSize: 15, outline: 'none',
-                    fontFamily: 'Nunito, sans-serif',
                     background: translating[idx] ? '#faf5ff' : '#fff',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
                   }}
-                  onFocus={e => e.target.style.borderColor = '#4ecdc4'}
-                  onBlur={e => { if (!translating[idx]) e.target.style.borderColor = '#e2e8f0'; }}
                 />
                 {translating[idx] && (
-                  <div style={{
-                    position: 'absolute', left: 10, top: '50%',
-                    transform: 'translateY(-50%)',
-                    fontSize: 16, animation: 'spin 1s linear infinite'
-                  }}>
-                    ⏳
-                  </div>
+                  <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16 }}>⏳</div>
                 )}
               </div>
 
-              {/* Phonetic */}
-              <div style={{ flex: 1, position: 'relative' }}>
-                <input
-                  value={word.phonetic}
-                  onChange={e => updateWord(idx, 'phonetic', e.target.value)}
-                  placeholder={translating[idx] ? '...' : 'הגייה'}
-                  dir="rtl"
-                  disabled={translating[idx]}
-                  style={{
-                    width: '100%', padding: '10px 12px', borderRadius: 12,
-                    border: `2px solid ${translating[idx] ? '#a855f7' : '#e2e8f0'}`,
-                    fontSize: 15, outline: 'none',
-                    fontFamily: 'Nunito, sans-serif',
-                    background: translating[idx] ? '#faf5ff' : '#fff',
-                    color: '#7c3aed',
-                    boxSizing: 'border-box'
-                  }}
-                  onFocus={e => e.target.style.borderColor = '#a855f7'}
-                  onBlur={e => { if (!translating[idx]) e.target.style.borderColor = '#e2e8f0'; }}
-                />
-              </div>
+              <input
+                value={word.phonetic}
+                onChange={e => updateWord(idx, 'phonetic', e.target.value)}
+                placeholder={translating[idx] ? '...' : 'הגייה'}
+                dir="rtl"
+                disabled={translating[idx]}
+                style={{
+                  flex: 1, padding: '10px 12px', borderRadius: 12,
+                  border: `2px solid ${translating[idx] ? '#a855f7' : '#e2e8f0'}`,
+                  fontSize: 15, outline: 'none', color: '#7c3aed',
+                  background: translating[idx] ? '#faf5ff' : '#fff',
+                }}
+              />
 
               <button
                 onClick={() => removeRow(idx)}
                 style={{
                   width: 32, height: 32, borderRadius: '50%',
                   background: '#fee2e2', color: '#ef4444',
-                  fontSize: 16, fontWeight: 800, flexShrink: 0
+                  fontSize: 16, fontWeight: 800, flexShrink: 0,
                 }}
-              >
-                ×
-              </button>
+              >×</button>
             </div>
           ))}
 
@@ -568,15 +363,12 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
               onClick={addRow}
               style={{
                 flex: 1, padding: '10px', borderRadius: 12,
-                background: '#f1f5f9', color: '#475569',
-                fontSize: 15, fontWeight: 700,
-                border: '2px dashed #cbd5e1', minWidth: 120
+                background: '#f1f5f9', color: '#475569', fontSize: 15, fontWeight: 700,
+                border: '2px dashed #cbd5e1', minWidth: 120,
               }}
-            >
-              + הוסיפי מילה
-            </button>
+            >+ הוסיפי מילה</button>
 
-            {apiKey && missingTranslations > 0 && (
+            {missingTranslations > 0 && (
               <button
                 onClick={handleTranslateAll}
                 disabled={bulkLoading}
@@ -584,36 +376,16 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
                   padding: '10px 16px', borderRadius: 12,
                   background: bulkLoading ? '#e2e8f0' : '#a855f7',
                   color: bulkLoading ? '#94a3b8' : '#fff',
-                  fontSize: 14, fontWeight: 700,
-                  border: 'none', minWidth: 160
+                  fontSize: 14, fontWeight: 700, border: 'none', minWidth: 160,
                 }}
               >
                 {bulkLoading ? '⏳ מתרגם...' : `✨ תרגמי הכל (${missingTranslations})`}
               </button>
             )}
-
-            <button
-              onClick={handleLoadSample}
-              style={{
-                padding: '10px 16px', borderRadius: 12,
-                background: '#fef3c7', color: '#92400e',
-                fontSize: 14, fontWeight: 700,
-                border: '2px solid #fde68a'
-              }}
-            >
-              דוגמה
-            </button>
           </div>
-        </div>
-      )}
 
-      {tab === 'manual' && (
-        <>
           {error && (
-            <div style={{
-              background: '#fee2e2', color: '#dc2626', borderRadius: 12,
-              padding: '12px 16px', marginBottom: 16, fontWeight: 700, textAlign: 'center'
-            }}>
+            <div style={{ marginTop: 12, background: '#fee2e2', color: '#dc2626', borderRadius: 12, padding: '12px 16px', fontWeight: 700, textAlign: 'center' }}>
               {error}
             </div>
           )}
@@ -621,16 +393,83 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
           <button
             onClick={handleStart}
             style={{
-              width: '100%', padding: '18px',
-              background: '#ff6b6b',
-              color: '#fff', borderRadius: 20, fontSize: 22,
-              fontWeight: 800, fontFamily: 'Fredoka One, cursive',
-              letterSpacing: 1,
+              width: '100%', marginTop: 16, padding: '18px',
+              background: '#ff6b6b', color: '#fff', borderRadius: 20,
+              fontSize: 22, fontWeight: 800, fontFamily: 'Fredoka One, cursive',
             }}
           >
             🚀 בואי נשחק!
           </button>
-        </>
+        </div>
+      )}
+
+      {/* ── BUILTIN TAB ── */}
+      {tab === 'builtin' && !selectedSet && (
+        <div>
+          <p style={{ color: '#64748b', fontSize: 15, marginBottom: 16, textAlign: 'center', fontWeight: 600 }}>
+            בחרי נושא ושחקי עם מילים לכיתה ג׳ — בלי להכניס כלום!
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {BUILTIN_SETS.map(set => (
+              <button
+                key={set.id}
+                onClick={() => setSelectedSet(set)}
+                style={{
+                  background: set.bg, border: `3px solid ${set.color}`,
+                  borderRadius: 20, padding: '20px 16px',
+                  textAlign: 'right', cursor: 'pointer',
+                  transition: 'transform 0.15s ease',
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <div style={{ fontSize: 36, marginBottom: 6 }}>{set.icon}</div>
+                <div style={{ fontFamily: 'Fredoka One, cursive', fontSize: 20, color: set.color, marginBottom: 4 }}>{set.name}</div>
+                <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>{set.words.length} מילים</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'builtin' && selectedSet && (
+        <div className="card" style={{ marginBottom: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <button
+              onClick={() => setSelectedSet(null)}
+              style={{ background: '#f1f5f9', borderRadius: 50, padding: '6px 14px', color: '#475569', fontSize: 14, fontWeight: 700 }}
+            >← חזרה</button>
+            <span style={{ fontSize: 28 }}>{selectedSet.icon}</span>
+            <span style={{ fontFamily: 'Fredoka One, cursive', fontSize: 22, color: selectedSet.color }}>{selectedSet.name}</span>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+            {selectedSet.words.map((w, i) => (
+              <div key={i} style={{
+                background: selectedSet.bg, border: `2px solid ${selectedSet.color}`,
+                borderRadius: 12, padding: '8px 14px', fontSize: 14,
+              }}>
+                <span dir="ltr" style={{ fontWeight: 800, color: selectedSet.color }}>{w.english}</span>
+                <span style={{ margin: '0 6px', color: '#cbd5e1' }}>|</span>
+                <span style={{ fontWeight: 600 }}>{w.hebrew}</span>
+                {w.phonetic && (
+                  <><span style={{ margin: '0 6px', color: '#cbd5e1' }}>|</span>
+                  <span style={{ color: '#a855f7', fontSize: 12 }}>{w.phonetic}</span></>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={() => onWordsReady(selectedSet.words.map(w => ({ ...w })))}
+            style={{
+              width: '100%', padding: '18px',
+              background: selectedSet.color, color: '#fff',
+              borderRadius: 20, fontSize: 22, fontWeight: 800,
+              fontFamily: 'Fredoka One, cursive',
+            }}
+          >🚀 בואי נשחק!</button>
+        </div>
       )}
     </div>
   );
