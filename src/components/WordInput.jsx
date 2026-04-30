@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react';
-import { createWorker } from 'tesseract.js';
-import { translateWord, translateBatch } from '../utils/gemini';
+import { translateWord, translateBatch, extractWordsFromImage } from '../utils/gemini';
 import { BUILTIN_SETS } from '../data/builtinWords';
 
 export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
@@ -11,6 +10,8 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
   const [error, setError] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [selectedSet, setSelectedSet] = useState(null);
+  const [imageWords, setImageWords] = useState([]); // words extracted from image
+  const [imagePreview, setImagePreview] = useState(null);
   const fileRef = useRef();
 
   const updateWord = (idx, field, value) => {
@@ -113,21 +114,41 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    // Reset state
+    setImageWords([]);
+    setError('');
+    // Show image preview
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
     setOcrLoading(true);
     try {
-      const worker = await createWorker(['eng', 'heb']);
-      const { data: { text } } = await worker.recognize(file);
-      await worker.terminate();
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-      const extracted = lines.map(line => ({ english: line, hebrew: '', phonetic: '' })).slice(0, 20);
-      if (extracted.length > 0) {
-        setWords(extracted);
-        setTab('manual');
-      }
-    } catch {
-      setError('לא הצלחתי לקרוא את התמונה. נסי להקליד ידנית.');
+      // Convert image to base64
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const extracted = await extractWordsFromImage(base64, file.type, apiKey);
+      setImageWords(extracted.map(w => ({
+        english: w.english?.trim().toLowerCase() || '',
+        hebrew: w.hebrew?.trim() || '',
+        phonetic: w.phonetic?.trim() || '',
+      })).filter(w => w.english && w.hebrew));
+    } catch (err) {
+      setError(`שגיאה בקריאת התמונה: ${err.message}`);
     }
     setOcrLoading(false);
+    // Reset file input so the same file can be re-selected
+    e.target.value = '';
+  };
+
+  const handlePlayImageWords = () => {
+    if (imageWords.length < 2) {
+      setError('לא נמצאו מספיק מילים בתמונה');
+      return;
+    }
+    onWordsReady(imageWords);
   };
 
   const missingTranslations = words.filter(w => w.english.trim() && !w.hebrew.trim()).length;
@@ -276,32 +297,159 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
       )}
 
       {tab === 'image' && (
-        <div className="card" style={{ marginBottom: 16, textAlign: 'center' }}>
-          <p style={{ marginBottom: 16, color: '#64748b', fontSize: 15 }}>
-            צלמי את רשימת המילים מבית הספר ואני אנסה לקרוא אותן!
-          </p>
+        <div className="card" style={{ marginBottom: 16 }}>
           <input
             ref={fileRef}
             type="file"
             accept="image/*"
+            capture="environment"
             style={{ display: 'none' }}
             onChange={handleImageUpload}
           />
-          <button
-            onClick={() => fileRef.current.click()}
-            disabled={ocrLoading}
-            style={{
-              background: '#4ecdc4', color: '#fff', borderRadius: 50,
-              padding: '14px 36px', fontSize: 17, fontWeight: 800,
-              opacity: ocrLoading ? 0.7 : 1,
-            }}
-          >
-            {ocrLoading ? '⏳ קורא תמונה...' : '📤 העלי תמונה'}
-          </button>
-          {!ocrLoading && words.some(w => w.english) && (
-            <p style={{ marginTop: 10, color: '#22c55e', fontWeight: 700 }}>
-              ✓ המילים הועברו! כעת עבור לטאב הקלדה
-            </p>
+
+          {/* Step 1: No API key */}
+          {!apiKey && (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ fontSize: 56, marginBottom: 12 }}>✨</div>
+              <p style={{ fontSize: 16, fontWeight: 700, color: '#7c3aed', marginBottom: 6 }}>
+                כדי לקרוא תמונה צריך לחבר את Gemini AI
+              </p>
+              <p style={{ color: '#64748b', fontSize: 14, marginBottom: 20 }}>
+                Gemini מזהה את המילים בתמונה ומתרגם אוטומטית — בלי להקליד כלום!
+              </p>
+              <button
+                onClick={onOpenApiModal}
+                style={{
+                  background: '#a855f7', color: '#fff', borderRadius: 50,
+                  padding: '14px 36px', fontSize: 16, fontWeight: 800,
+                }}
+              >
+                חברי Gemini ←
+              </button>
+            </div>
+          )}
+
+          {/* Step 2: Initial upload state */}
+          {apiKey && !ocrLoading && imageWords.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '16px 0' }}>
+              <div style={{ fontSize: 72, marginBottom: 8 }}>📷</div>
+              <p style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+                צלמי את דף המילים מבית הספר!
+              </p>
+              <p style={{ color: '#64748b', fontSize: 14, marginBottom: 24 }}>
+                Gemini יקרא את המילים, יתרגם לעברית ויפתח את המשחק — הכל אוטומטית 🪄
+              </p>
+              <button
+                onClick={() => fileRef.current.click()}
+                style={{
+                  background: 'linear-gradient(135deg, #4ecdc4, #a855f7)',
+                  color: '#fff', borderRadius: 50,
+                  padding: '16px 40px', fontSize: 18, fontWeight: 800,
+                  boxShadow: '0 4px 20px rgba(168,85,247,0.35)',
+                }}
+              >
+                📤 העלי תמונה
+              </button>
+            </div>
+          )}
+
+          {/* Step 3: Loading */}
+          {apiKey && ocrLoading && (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              {imagePreview && (
+                <img
+                  src={imagePreview}
+                  alt="תמונה שהועלתה"
+                  style={{
+                    maxHeight: 180, maxWidth: '100%', borderRadius: 16,
+                    marginBottom: 20, objectFit: 'contain',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+                  }}
+                />
+              )}
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+              <p style={{ fontSize: 18, fontWeight: 800, color: '#7c3aed', marginBottom: 6 }}>
+                Gemini קורא את המילים...
+              </p>
+              <p style={{ color: '#94a3b8', fontSize: 14 }}>
+                זה לוקח כמה שניות
+              </p>
+            </div>
+          )}
+
+          {/* Step 4: Words extracted — show & play */}
+          {apiKey && !ocrLoading && imageWords.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <span style={{ fontSize: 24 }}>✅</span>
+                <span style={{ fontWeight: 800, fontSize: 17, color: '#16a34a' }}>
+                  מצאתי {imageWords.length} מילים!
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                {imageWords.map((w, i) => (
+                  <div key={i} style={{
+                    background: '#f0fdf4', border: '2px solid #86efac',
+                    borderRadius: 12, padding: '8px 14px', fontSize: 14,
+                    display: 'flex', gap: 8, alignItems: 'center',
+                  }}>
+                    <span dir="ltr" style={{ fontWeight: 800, color: '#15803d' }}>{w.english}</span>
+                    <span style={{ color: '#cbd5e1' }}>|</span>
+                    <span style={{ fontWeight: 600 }}>{w.hebrew}</span>
+                    {w.phonetic && (
+                      <>
+                        <span style={{ color: '#cbd5e1' }}>|</span>
+                        <span style={{ color: '#a855f7', fontSize: 12 }}>{w.phonetic}</span>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => { setImageWords([]); setImagePreview(null); fileRef.current.click(); }}
+                  style={{
+                    flex: 1, minWidth: 120, padding: '12px',
+                    background: '#f1f5f9', color: '#475569',
+                    borderRadius: 14, fontSize: 15, fontWeight: 700,
+                    border: '2px dashed #cbd5e1',
+                  }}
+                >
+                  📷 תמונה חדשה
+                </button>
+                <button
+                  onClick={handlePlayImageWords}
+                  style={{
+                    flex: 2, minWidth: 160, padding: '16px',
+                    background: 'linear-gradient(135deg, #ff6b6b, #a855f7)',
+                    color: '#fff', borderRadius: 20, fontSize: 20,
+                    fontWeight: 800, fontFamily: 'Fredoka One, cursive',
+                    boxShadow: '0 4px 20px rgba(255,107,107,0.35)',
+                  }}
+                >
+                  🚀 בואי נשחק!
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && tab === 'image' && (
+            <div style={{
+              marginTop: 16, background: '#fee2e2', color: '#dc2626',
+              borderRadius: 12, padding: '12px 16px', fontWeight: 700, textAlign: 'center',
+              fontSize: 14,
+            }}>
+              {error}
+              <button
+                onClick={() => { setError(''); setImageWords([]); setImagePreview(null); }}
+                style={{ marginRight: 10, textDecoration: 'underline', background: 'none', color: '#dc2626', fontWeight: 700 }}
+              >
+                נסי שוב
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -459,7 +607,7 @@ export default function WordInput({ onWordsReady, apiKey, onOpenApiModal }) {
         </div>
       )}
 
-      {tab !== 'builtin' && (
+      {tab === 'manual' && (
         <>
           {error && (
             <div style={{

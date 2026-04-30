@@ -2,6 +2,60 @@ const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 /**
+ * Given a base64-encoded image, extracts English words and returns their
+ * Hebrew translation + nikud phonetics in one Gemini Vision call.
+ */
+export async function extractWordsFromImage(imageBase64, mimeType, apiKey) {
+  const prompt = `This is a photo of an English vocabulary list from an Israeli elementary school.
+Extract ALL English words visible in this image. For each word provide:
+1. The English word (exactly as written)
+2. Its Hebrew translation (simple, for a child)
+3. How to pronounce it using Hebrew letters WITH nikud, hyphens between syllables (e.g. אֶ-פֶּל for "apple")
+
+Return ONLY a valid JSON array — no markdown, no code blocks, nothing else:
+[
+  {
+    "english": "<English word>",
+    "hebrew": "<Hebrew translation>",
+    "phonetic": "<pronunciation in Hebrew letters with nikud>"
+  }
+]
+Rules:
+- Extract ONLY English words; ignore any Hebrew text in the image
+- Keep the English word exactly as written (original capitalisation)
+- Phonetic MUST use Hebrew letters with nikud marks
+- Return ONLY the JSON array`;
+
+  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: mimeType, data: imageBase64 } },
+          { text: prompt },
+        ],
+      }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!text) throw new Error('תגובה ריקה מ-Gemini');
+
+  const cleaned = text.replace(/```json|```/g, '').trim();
+  const parsed = JSON.parse(cleaned);
+  if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('לא נמצאו מילים בתמונה');
+  return parsed;
+}
+
+/**
  * Given an English word, returns { hebrew, phonetic } where:
  *   hebrew  – Hebrew translation
  *   phonetic – how the word sounds spelled in Hebrew letters with nikud
