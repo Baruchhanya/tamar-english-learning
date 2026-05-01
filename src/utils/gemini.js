@@ -1,10 +1,7 @@
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
-const API_KEY = import.meta.env.VITE_GEMINI_KEY;
+const WORKER_URL = 'https://tamar-gemini.baruchhanya.workers.dev';
 
 async function callGemini(body) {
-  const res = await fetch(`${GEMINI_URL}?key=${API_KEY}`, {
+  const res = await fetch(WORKER_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
