@@ -38,37 +38,53 @@ export default function App() {
   const goToInput = () => setScreen(SCREENS.INPUT);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fef9f0' }}>
+    <div style={{ minHeight: '100vh' }}>
       <header style={{
-        background: '#fff',
-        borderBottom: '3px solid #ffe4e6',
-        padding: '14px 24px',
+        background: 'rgba(255,255,255,0.85)',
+        backdropFilter: 'blur(12px)',
+        borderBottom: '3px solid rgba(168,85,247,0.2)',
+        padding: '12px 24px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 32,
+        marginBottom: 28,
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        boxShadow: '0 2px 20px rgba(168,85,247,0.1)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 28 }}>⭐</span>
-          <span style={{
-            fontFamily: 'Fredoka One, cursive',
-            fontSize: 22,
-            color: '#ff6b6b',
-          }}>
-            תמר לומדת אנגלית
-          </span>
+          <span style={{ fontSize: 32, animation: 'float 3s ease-in-out infinite' }}>🌟</span>
+          <div>
+            <div style={{
+              fontFamily: 'Fredoka, cursive',
+              fontSize: 22,
+              fontWeight: 700,
+              background: 'linear-gradient(135deg, #ff6b9d, #a855f7, #4ecdc4)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              lineHeight: 1.1,
+            }}>
+              תמר לומדת אנגלית
+            </div>
+            <div style={{ fontSize: 11, color: '#a855f7', fontWeight: 700, opacity: 0.7 }}>
+              לחצי על כל מילה כדי לשמוע אותה 🔊
+            </div>
+          </div>
         </div>
 
         {screen !== SCREENS.INPUT && (
           <button
             onClick={goToInput}
             style={{
-              background: '#fff5f5', border: '2px solid #fecaca',
-              borderRadius: 50, padding: '8px 16px',
-              color: '#ef4444', fontSize: 14, fontWeight: 700,
+              background: 'linear-gradient(135deg, #ffd6e7, #c7f2ff)',
+              border: '2px solid #f0abca',
+              borderRadius: 50, padding: '8px 18px',
+              color: '#7c3aed', fontSize: 14, fontWeight: 800,
+              boxShadow: '0 2px 10px rgba(168,85,247,0.2)',
             }}
           >
-            מילים חדשות
+            📷 מילים חדשות
           </button>
         )}
       </header>

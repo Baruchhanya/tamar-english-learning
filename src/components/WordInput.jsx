@@ -151,12 +151,20 @@ export default function WordInput({ onWordsReady }) {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 16px' }}>
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <div style={{ fontSize: 64, marginBottom: 8 }}>📚</div>
-        <h1 style={{ fontFamily: 'Fredoka One, cursive', fontSize: 36, color: '#ff6b6b', marginBottom: 8 }}>
-          בואי נלמד מילים!
+        <div style={{ fontSize: 72, marginBottom: 8, animation: 'float 3s ease-in-out infinite', display: 'inline-block' }}>🦄</div>
+        <h1 style={{
+          fontFamily: 'Fredoka, cursive',
+          fontSize: 40,
+          fontWeight: 700,
+          marginBottom: 8,
+          background: 'linear-gradient(135deg, #ff6b9d, #a855f7)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>
+          שלום תמר! 🌈
         </h1>
-        <p style={{ color: '#64748b', fontSize: 17 }}>
-          צלמי את המילים מבית הספר ונתחיל לשחק
+        <p style={{ color: '#7c6fa0', fontSize: 17, fontWeight: 600 }}>
+          צלמי את המילים מבית הספר ונשחק! 🎉
         </p>
       </div>
 
@@ -165,17 +173,22 @@ export default function WordInput({ onWordsReady }) {
         {[
           { id: 'image',   label: '📷 תמונה' },
           { id: 'manual',  label: '✏️ הקלדה' },
-          { id: 'builtin', label: '🎮 משחקים מובנים' },
+          { id: 'builtin', label: '🎮 משחקים' },
         ].map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             style={{
-              flex: 1, padding: '12px', borderRadius: 14,
-              background: tab === t.id ? '#ff6b6b' : '#fff',
-              color: tab === t.id ? '#fff' : '#64748b',
-              fontSize: 15, fontWeight: 700,
-              border: tab === t.id ? 'none' : '2px solid #e2e8f0',
+              flex: 1, padding: '13px 8px', borderRadius: 50,
+              background: tab === t.id
+                ? 'linear-gradient(135deg, #ff6b9d, #a855f7)'
+                : 'rgba(255,255,255,0.8)',
+              color: tab === t.id ? '#fff' : '#7c6fa0',
+              fontSize: 14, fontWeight: 800,
+              border: tab === t.id ? 'none' : '2px solid rgba(168,85,247,0.2)',
+              boxShadow: tab === t.id ? '0 4px 14px rgba(255,107,157,0.4)' : 'none',
+              transform: tab === t.id ? 'scale(1.03)' : 'scale(1)',
+              transition: 'all 0.2s',
             }}
           >
             {t.label}
