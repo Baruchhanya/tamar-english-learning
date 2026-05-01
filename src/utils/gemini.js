@@ -88,8 +88,25 @@ Rules:
     }],
     generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
   });
-  const cleaned = text.replace(/```json|```/g, '').trim();
-  const parsed = JSON.parse(cleaned);
+  
+  let cleaned = text.replace(/```json|```/g, '').trim();
+  
+  // Sometimes Gemini returns text before/after the JSON array.
+  // We'll try to extract just the array part.
+  const arrayStart = cleaned.indexOf('[');
+  const arrayEnd = cleaned.lastIndexOf(']');
+  if (arrayStart !== -1 && arrayEnd !== -1) {
+    cleaned = cleaned.substring(arrayStart, arrayEnd + 1);
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (e) {
+    console.error("Gemini returned invalid JSON:", text);
+    throw new Error(`התשובה לא בפורמט תקין: ${e.message}`);
+  }
+
   if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('לא נמצאו מילים בתמונה');
   return parsed;
 }
