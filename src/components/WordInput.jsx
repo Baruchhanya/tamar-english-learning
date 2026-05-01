@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { translateWord, translateBatch, extractWordsFromImage } from '../utils/gemini';
 import { BUILTIN_SETS } from '../data/builtinWords';
 
@@ -12,7 +12,59 @@ export default function WordInput({ onWordsReady }) {
   const [imageWords, setImageWords] = useState([]);
   const [imagePreview, setImagePreview] = useState(null);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [pasteHint, setPasteHint] = useState(false); // flashes when paste detected
   const fileRef = useRef();
+
+  // Shared logic: process any image File/Blob
+  const processImageFile = useCallback(async (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    setImageWords([]);
+    setError('');
+    setImagePreview(URL.createObjectURL(file));
+    setOcrLoading(true);
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const extracted = await extractWordsFromImage(base64, file.type);
+      setImageWords(
+        extracted
+          .map(w => ({
+            english: w.english?.trim().toLowerCase() || '',
+            hebrew: w.hebrew?.trim() || '',
+            phonetic: w.phonetic?.trim() || '',
+          }))
+          .filter(w => w.english && w.hebrew)
+      );
+    } catch (err) {
+      setError(`שגיאה בקריאת התמונה: ${err.message}`);
+    }
+    setOcrLoading(false);
+  }, []);
+
+  // Global paste listener — active only when the image tab is open and not already loading
+  useEffect(() => {
+    if (tab !== 'image') return;
+    const onPaste = (e) => {
+      if (ocrLoading) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          setPasteHint(true);
+          setTimeout(() => setPasteHint(false), 1000);
+          processImageFile(item.getAsFile());
+          return;
+        }
+      }
+    };
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [tab, ocrLoading, processImageFile]);
 
   const updateWord = (idx, field, value) => {
     const updated = [...words];
@@ -83,30 +135,9 @@ export default function WordInput({ onWordsReady }) {
     })));
   };
 
-  const handleImageUpload = async (e) => {
+  const handleImageUpload = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-    setImageWords([]);
-    setError('');
-    setImagePreview(URL.createObjectURL(file));
-    setOcrLoading(true);
-    try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const extracted = await extractWordsFromImage(base64, file.type);
-      setImageWords(extracted.map(w => ({
-        english: w.english?.trim().toLowerCase() || '',
-        hebrew: w.hebrew?.trim() || '',
-        phonetic: w.phonetic?.trim() || '',
-      })).filter(w => w.english && w.hebrew));
-    } catch (err) {
-      setError(`שגיאה בקריאת התמונה: ${err.message}`);
-    }
-    setOcrLoading(false);
+    if (file) processImageFile(file);
     e.target.value = '';
   };
 
@@ -181,24 +212,75 @@ export default function WordInput({ onWordsReady }) {
           {/* Initial upload */}
           {!ocrLoading && imageWords.length === 0 && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <div style={{ fontSize: 80, marginBottom: 8 }}>📷</div>
+              <div style={{ fontSize: 72, marginBottom: 8 }}>📷</div>
               <p style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 6 }}>
                 צלמי את דף המילים מבית הספר!
               </p>
-              <p style={{ color: '#64748b', fontSize: 15, marginBottom: 28 }}>
+              <p style={{ color: '#64748b', fontSize: 15, marginBottom: 24 }}>
                 Gemini יקרא את המילים, יתרגם ויפתח את המשחק 🪄
               </p>
-              <button
-                onClick={() => fileRef.current.click()}
+
+              {/* Two action buttons */}
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
+                <button
+                  onClick={() => fileRef.current.click()}
+                  style={{
+                    background: 'linear-gradient(135deg, #4ecdc4, #a855f7)',
+                    color: '#fff', borderRadius: 50,
+                    padding: '16px 36px', fontSize: 18, fontWeight: 800,
+                    boxShadow: '0 4px 20px rgba(168,85,247,0.35)',
+                  }}
+                >
+                  📤 העלי קובץ
+                </button>
+
+                <button
+                  onClick={async () => {
+                    try {
+                      const items = await navigator.clipboard.read();
+                      for (const item of items) {
+                        const imgType = item.types.find(t => t.startsWith('image/'));
+                        if (imgType) {
+                          const blob = await item.getType(imgType);
+                          processImageFile(new File([blob], 'paste.png', { type: imgType }));
+                          return;
+                        }
+                      }
+                      setError('לא נמצאה תמונה בלוח. העתיקי תמונה ונסי שוב, או השתמשי ב-Ctrl+V / Cmd+V.');
+                    } catch {
+                      setError('הדביקי תמונה עם Ctrl+V / Cmd+V — הדפדפן לא אפשר גישה ישירה ללוח.');
+                    }
+                  }}
+                  style={{
+                    background: pasteHint
+                      ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+                      : 'linear-gradient(135deg, #f97316, #ec4899)',
+                    color: '#fff', borderRadius: 50,
+                    padding: '16px 36px', fontSize: 18, fontWeight: 800,
+                    boxShadow: '0 4px 20px rgba(249,115,22,0.35)',
+                    transition: 'background 0.3s',
+                  }}
+                >
+                  📋 הדביקי צילום מסך
+                </button>
+              </div>
+
+              {/* Paste drop-zone hint */}
+              <div
                 style={{
-                  background: 'linear-gradient(135deg, #4ecdc4, #a855f7)',
-                  color: '#fff', borderRadius: 50,
-                  padding: '18px 48px', fontSize: 20, fontWeight: 800,
-                  boxShadow: '0 4px 20px rgba(168,85,247,0.35)',
+                  border: `2px dashed ${pasteHint ? '#22c55e' : '#c4b5fd'}`,
+                  borderRadius: 16, padding: '14px 20px',
+                  color: pasteHint ? '#16a34a' : '#7c3aed',
+                  fontSize: 14, fontWeight: 600,
+                  background: pasteHint ? '#f0fdf4' : '#faf5ff',
+                  transition: 'all 0.3s',
+                  maxWidth: 380, margin: '0 auto',
                 }}
               >
-                📤 העלי תמונה
-              </button>
+                {pasteHint
+                  ? '✅ תמונה זוהתה מהלוח!'
+                  : '💡 אפשר גם פשוט ללחוץ Ctrl+V / Cmd+V בכל מקום בדף'}
+              </div>
             </div>
           )}
 
