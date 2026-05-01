@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { translateWord, translateBatch, extractWordsFromImage } from '../utils/gemini';
 import { BUILTIN_SETS } from '../data/builtinWords';
 
-export default function WordInput({ onWordsReady }) {
+export default function WordInput({ onWordsReady, onImageWordsReady }) {
   const [words, setWords] = useState([{ english: '', hebrew: '', phonetic: '' }]);
   const [translating, setTranslating] = useState({});
   const [tab, setTab] = useState('image');
@@ -143,7 +143,9 @@ export default function WordInput({ onWordsReady }) {
 
   const handlePlayImageWords = () => {
     if (imageWords.length < 2) { setError('לא נמצאו מספיק מילים בתמונה'); return; }
-    onWordsReady(imageWords);
+    // Use dedicated image callback so App can save as weekly game
+    if (onImageWordsReady) onImageWordsReady(imageWords);
+    else onWordsReady(imageWords);
   };
 
   const missingTranslations = words.filter(w => w.english.trim() && !w.hebrew.trim()).length;
