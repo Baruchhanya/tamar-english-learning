@@ -8,7 +8,18 @@ export function shuffle(array) {
 }
 
 export function getRandomChoices(words, correctWord, count = 4) {
-  const others = words.filter(w => w.english !== correctWord.english);
-  const shuffled = shuffle(others).slice(0, count - 1);
+  const others = words.filter(w => w.english !== correctWord.english && w.hebrew !== correctWord.hebrew);
+  
+  // ensure unique hebrew options among choices
+  const uniqueOthers = [];
+  const seen = new Set([correctWord.hebrew]);
+  for (const w of shuffle(others)) {
+    if (!seen.has(w.hebrew)) {
+      seen.add(w.hebrew);
+      uniqueOthers.push(w);
+    }
+  }
+  
+  const shuffled = uniqueOthers.slice(0, count - 1);
   return shuffle([correctWord, ...shuffled]);
 }

@@ -4,8 +4,18 @@ import { shuffle } from '../../utils/shuffle';
 import EnglishWord from '../EnglishWord';
 
 export default function MemoryMatch({ words, onBack }) {
-  const maxPairs = Math.min(words.length, 6);
-  const [selectedWords] = useState(() => shuffle(words).slice(0, maxPairs));
+  const [selectedWords] = useState(() => {
+    const shuffled = shuffle(words);
+    const unique = [];
+    const seen = new Set();
+    for (const w of shuffled) {
+      if (!seen.has(w.hebrew)) {
+        seen.add(w.hebrew);
+        unique.push(w);
+      }
+    }
+    return unique.slice(0, 6);
+  });
   const [cards, setCards] = useState([]);
   const [flipped, setFlipped] = useState([]);
   const [matched, setMatched] = useState([]);
