@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { translateWord, translateBatch, extractWordsFromImage } from '../utils/gemini';
 import { BUILTIN_SETS } from '../data/builtinWords';
 
-export default function WordInput({ onWordsReady, onImageWordsReady }) {
+export default function WordInput({ onWordsReady, onImageWordsReady, history = [], onSelectHistory }) {
   const [words, setWords] = useState([{ english: '', hebrew: '', phonetic: '' }]);
   const [translating, setTranslating] = useState({});
   const [tab, setTab] = useState('image');
@@ -566,6 +566,43 @@ export default function WordInput({ onWordsReady, onImageWordsReady }) {
               fontFamily: 'Fredoka One, cursive',
             }}
           >🚀 בואי נשחק!</button>
+        </div>
+      )}
+
+      {/* ── LAST DICTATION SECTION ── */}
+      {history.length > 0 && tab === 'image' && !ocrLoading && imageWords.length === 0 && (
+        <div style={{
+          marginTop: 24,
+          background: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
+          borderRadius: 22,
+          padding: '20px 16px',
+          border: '3px solid #fde047',
+          textAlign: 'right',
+          boxShadow: '0 4px 14px rgba(234,179,8,0.15)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <span style={{ fontSize: 24 }}>🕒</span>
+            <h2 style={{ fontFamily: 'Fredoka, cursive', fontSize: 22, fontWeight: 700, color: '#b45309', margin: 0 }}>
+              ההכתבה האחרונה שלך
+            </h2>
+          </div>
+          
+          <p style={{ color: '#d97706', fontSize: 14, fontWeight: 600, marginBottom: 16 }}>
+            מילים: {history[0].words.map(w => w.english).join(', ')}
+          </p>
+
+          <button
+            onClick={() => onSelectHistory && onSelectHistory(history[0])}
+            style={{
+              width: '100%', padding: '14px',
+              background: '#f59e0b', color: '#fff',
+              borderRadius: 16, fontSize: 18, fontWeight: 800,
+              fontFamily: 'Fredoka One, cursive',
+              boxShadow: '0 4px 14px rgba(245,158,11,0.3)',
+            }}
+          >
+            🚀 שחקי שוב בהכתבה האחרונה!
+          </button>
         </div>
       )}
     </div>

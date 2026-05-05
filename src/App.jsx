@@ -200,6 +200,8 @@ export default function App() {
           <WordInput
             onImageWordsReady={handleImageWordsReady}
             onWordsReady={handleOtherWordsReady}
+            history={history}
+            onSelectHistory={handleSelectHistory}
           />
         )}
         {screen === SCREENS.HISTORY && (
