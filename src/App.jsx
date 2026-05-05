@@ -2,17 +2,20 @@ import { useState } from 'react';
 import WordInput from './components/WordInput';
 import WeeklyHome from './components/WeeklyHome';
 import GameSelector from './components/GameSelector';
+import DictationHistory from './components/DictationHistory';
 import Flashcard from './components/games/Flashcard';
 import MultipleChoice from './components/games/MultipleChoice';
 import MemoryMatch from './components/games/MemoryMatch';
 import SpellingBee from './components/games/SpellingBee';
 
 const STORAGE_KEY = 'tamar_weekly_game';
+const HISTORY_STORAGE_KEY = 'tamar_dictation_history';
 
 const SCREENS = {
   WEEKLY:     'weekly',    // home screen — shows saved weekly words
   INPUT:      'input',     // upload / type new words
   SELECT:     'select',    // choose a game (used when coming from manual/builtin)
+  HISTORY:    'history',   // dictation history screen
   FLASHCARD:  'flashcard',
   MULTICHOICE:'multichoice',
   MEMORY:     'memory',
@@ -35,17 +38,38 @@ function saveWeekly(words) {
   } catch { /* ignore quota errors */ }
 }
 
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch { return []; }
+}
+
+function saveToHistory(words) {
+  try {
+    const history = loadHistory();
+    const newItem = { id: Date.now(), savedAt: new Date().toISOString(), words };
+    const newHistory = [newItem, ...history].slice(0, 20); // Keep last 20
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(newHistory));
+  } catch { /* ignore */ }
+}
+
 export default function App() {
   const [weekly]  = useState(() => loadWeekly()); // saved weekly game (null if first visit)
   const [words, setWords]   = useState(() => weekly?.words || []);
   const [savedAt, setSavedAt] = useState(() => weekly?.savedAt || null);
   const [screen, setScreen] = useState(() => weekly ? SCREENS.WEEKLY : SCREENS.INPUT);
 
+  const [history, setHistory] = useState(() => loadHistory());
+
   // Called when words come from IMAGE upload — save as weekly game
   const handleImageWordsReady = (w) => {
     saveWeekly(w);
+    saveToHistory(w);
     setWords(w);
     setSavedAt(new Date().toISOString());
+    setHistory(loadHistory());
     setScreen(SCREENS.WEEKLY);
   };
 
@@ -53,6 +77,13 @@ export default function App() {
   const handleOtherWordsReady = (w) => {
     setWords(w);
     setScreen(SCREENS.SELECT);
+  };
+
+  const handleSelectHistory = (item) => {
+    saveWeekly(item.words);
+    setWords(item.words);
+    setSavedAt(item.savedAt);
+    setScreen(SCREENS.WEEKLY);
   };
 
   const handleSelectGame = (gameId) => {
@@ -65,12 +96,14 @@ export default function App() {
     setScreen(map[gameId] || SCREENS.WEEKLY);
   };
 
-  const goToWeekly = () => setScreen(SCREENS.WEEKLY);
-  const goToInput  = () => setScreen(SCREENS.INPUT);
-  const goToSelect = () => setScreen(SCREENS.SELECT);
+  const goToWeekly  = () => setScreen(SCREENS.WEEKLY);
+  const goToInput   = () => setScreen(SCREENS.INPUT);
+  const goToSelect  = () => setScreen(SCREENS.SELECT);
+  const goToHistory = () => setScreen(SCREENS.HISTORY);
 
-  const showBack = ![SCREENS.INPUT, SCREENS.WEEKLY].includes(screen);
-  const showNewWords = screen !== SCREENS.INPUT;
+  const showBack = ![SCREENS.INPUT, SCREENS.WEEKLY, SCREENS.HISTORY].includes(screen);
+  const showNewWords = screen !== SCREENS.INPUT && screen !== SCREENS.HISTORY;
+  const showHistory = screen !== SCREENS.HISTORY;
 
   return (
     <div style={{ minHeight: '100vh' }}>
@@ -111,6 +144,20 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
+          {showHistory && history.length > 0 && (
+            <button
+              onClick={goToHistory}
+              style={{
+                background: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
+                border: '2px solid #fde047',
+                borderRadius: 50, padding: '8px 16px',
+                color: '#d97706', fontSize: 13, fontWeight: 800,
+                boxShadow: '0 2px 10px rgba(234,179,8,0.2)',
+              }}
+            >
+              📚 היסטוריית הכתבות
+            </button>
+          )}
           {showBack && (
             <button
               onClick={weekly ? goToWeekly : goToSelect}
@@ -153,6 +200,13 @@ export default function App() {
           <WordInput
             onImageWordsReady={handleImageWordsReady}
             onWordsReady={handleOtherWordsReady}
+          />
+        )}
+        {screen === SCREENS.HISTORY && (
+          <DictationHistory
+            history={history}
+            onSelectHistory={handleSelectHistory}
+            onBack={weekly ? goToWeekly : goToInput}
           />
         )}
         {screen === SCREENS.SELECT && (

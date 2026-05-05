@@ -49,7 +49,7 @@ Return ONLY a valid JSON array (no markdown):
 
   const text = await callGemini({
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 1000 },
+    generationConfig: { temperature: 0.1, maxOutputTokens: 4000 },
   });
   const cleaned = text.replace(/```json|```/g, '').trim();
   return JSON.parse(cleaned);
@@ -86,7 +86,7 @@ Rules:
         { text: prompt },
       ],
     }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
+    generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
   });
   
   let cleaned = text.replace(/```json|```/g, '').trim();
@@ -95,8 +95,19 @@ Rules:
   // We'll try to extract just the array part.
   const arrayStart = cleaned.indexOf('[');
   const arrayEnd = cleaned.lastIndexOf(']');
-  if (arrayStart !== -1 && arrayEnd !== -1) {
-    cleaned = cleaned.substring(arrayStart, arrayEnd + 1);
+  if (arrayStart !== -1) {
+    if (arrayEnd !== -1 && arrayEnd > arrayStart) {
+      cleaned = cleaned.substring(arrayStart, arrayEnd + 1);
+    } else {
+      // Truncated response, missing closing bracket
+      cleaned = cleaned.substring(arrayStart);
+      const lastObjEnd = cleaned.lastIndexOf('}');
+      if (lastObjEnd !== -1) {
+        cleaned = cleaned.substring(0, lastObjEnd + 1) + ']';
+      } else {
+        cleaned += ']';
+      }
+    }
   }
 
   let parsed;
