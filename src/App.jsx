@@ -41,7 +41,16 @@ function saveWeekly(words) {
 function loadHistory() {
   try {
     const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) {
+      // Migrate from old weekly game if history is empty
+      const weekly = loadWeekly();
+      if (weekly) {
+        const migratedHistory = [{ id: Date.now(), savedAt: weekly.savedAt || new Date().toISOString(), words: weekly.words }];
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(migratedHistory));
+        return migratedHistory;
+      }
+      return [];
+    }
     return JSON.parse(raw);
   } catch { return []; }
 }
